@@ -45,6 +45,9 @@ $
 
 ## 問題点への対応
 ### bundle installされない
+{% highlight ruby %}
+require 'bundle/capistrano'
+{% endhighlight %}
 ### rvmに対応してない
 ### assets:precompileされない
 ### 鍵認証
