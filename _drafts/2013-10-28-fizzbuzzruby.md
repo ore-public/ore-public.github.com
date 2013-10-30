@@ -47,8 +47,21 @@ for文で1から100までのループを回しながら、わり切れるかど�
 処理としてはちゃんと動いてますが、ちょっと書き方がRubyっぽくないです。
 
 #### 1..100 という書き方について
-TODO:Rangeについて説明する
-ついでにArrayも説明する。
+for文に 1..100という表記があります。これは文法ではなくRubyのオブジェクトの表現です。この書き方だと1〜100の範囲を表すRangeクラスのオブジェクトが生成されます。
+
+で他の言語にもよくある配列ですが、Rubyでは \[1,5,9,100\] の用に書くと配列になります。配列はRubyではArrayクラスのオブジェクトです。irbコマンドでちょっと確認してみましょう。
+
+{% highlight ruby %}
+2.0.0-p247 :012 >   1..100
+ => 1..100
+2.0.0-p247 :013 > (1..100).class
+ => Range
+2.0.0-p247 :014 > [1,5,9,100]
+ => [1, 5, 9, 100]
+2.0.0-p247 :015 > [1,5,9,100].class
+ => Array
+2.0.0-p247 :016 >
+{% endhighlight %}
 
 # ちょっとRubyっぽく Range#each を使う
 {% highlight ruby %}
@@ -190,7 +203,7 @@ fizzbuzz_result = (1..100).map{ |num| fizzbuzz(num) }
 end
 {% endhighlight %}
 
-この時点でのFizzBuzzの全容は下のようになります。
+この時点でのFizzBuzzの全容は下のようになります。かなりRubyっぽくなりました。
 
 {% highlight ruby %}
 ## FizzBuzzの判定をするメソッド
@@ -208,11 +221,152 @@ end
 {% endhighlight %}
 
 
-#
-
-
-
+# オープンクラスを使う
+この辺りからRubyの特徴的な機能を使って行こうと思います。
+いままでのコードでは class を使ってませんでした。
+Rubyの class はこんな感じに使います。
 
 {% highlight ruby %}
- 
+class Hoge
+  def hello
+    puts "hello"
+  end
+end
+
+h = Hoge.new
+h.hello
 {% endhighlight %}
+
+よくあるHello World的なプログラムです。
+ここでは新しいクラスを作って処理(helloメソッド)を実装していますね。
+
+ところでRubyにはオープンクラスという機能がありまして、新しくクラスを作るだけでなく、既存のクラスをオープンしてメソッドを追加したり、処理を書き換えたり出来ます。動的にもほどがある。
+
+そして、この機能は上記の例のHogeの様な自分で作ったクラスだけではなく、StringとかFixnumとかRubyの組み込みクラスに対しても例外なく出来たりします。
+
+FizzBuzzは数値にたいして行う処理なので、数値のクラスにfizzbuzzメソッドを追加してしまいましょう。
+
+{% highlight ruby %}
+class Fixnum
+  def fizzbuzz
+    return :FizzBuzz if self % 15 == 0
+    return :Buzz if self % 5 == 0
+    return :Fizz if self % 3 == 0
+
+    self
+  end
+end
+{% endhighlight %}
+前に作ったfizzbuzzメソッドによく似てますが少し違います。Fixnumクラスのメソッドとして定義されていますし、fizzbuzzメソッドには引数がありません。
+Fixnumクラスは「3」とか「100」とかの数値オブジェクトのクラスです。そのクラスのメソッドなので、メソッド内では数値自体はselfとなります。selfに対してFizzBuzzの判定を行っているわけですね。
+
+これでどうなるか見てみましょう。
+
+{% highlight ruby %}
+2.0.0-p247 :018 >   class Fixnum
+2.0.0-p247 :019?>     def fizzbuzz
+2.0.0-p247 :020?>         return :FizzBuzz if self % 15 == 0
+2.0.0-p247 :021?>         return :Buzz if self % 5 == 0
+2.0.0-p247 :022?>         return :Fizz if self % 3 == 0
+2.0.0-p247 :023?>
+2.0.0-p247 :024 >           self
+2.0.0-p247 :025?>       end
+2.0.0-p247 :026?>   end
+ => nil
+2.0.0-p247 :027 > 3.fizzbuzz
+ => :Fizz
+2.0.0-p247 :028 > 10.fizzbuzz
+ => :Buzz
+2.0.0-p247 :029 > 15.fizzbuzz
+ => :FizzBuzz
+2.0.0-p247 :030 > 19.fizzbuzz
+ => 19 
+{% endhighlight %}
+ちゃんと数値に新しくメソッドが定義されてますね。
+
+このクラスを使ったFizzBuzzの実装の全容が以下です。
+
+{% highlight ruby %}
+class Fixnum
+  def fizzbuzz
+    return :FizzBuzz if self % 15 == 0
+    return :Buzz if self % 5 == 0
+    return :Fizz if self % 3 == 0
+
+    self
+  end
+end
+
+(1..100).map {|num| num.fizzbuzz}.each do |num|
+  puts num
+end 
+{% endhighlight %}
+mapの中身も少し変わっていますね。fizzbuzzメソッドに数値を渡すのではなく、数値自信のfizzbuzzメソッドを呼んでいます。
+
+# Refinementsを使う
+便利なような、危ないようなオープンクラスですが、実際こんなのを実際のプロジェクトで知らないところでさらっと使われてたら混乱します。
+クラスを作った人の意図とは違う動きになるように出来てしまうわけなので。やろうと思えば（割と簡単に）「 5 + 3 」の実行結果を「2」になるようにというのも出来てしまいます。
+アプリケーションの初期化処理の中などで、こんなことをされたら色々と不都合が起きますよね。
+
+こういった変更の影響範囲を限定させる必要性が出てきます。Ruby2.0から使えるようになったRefinementsが使えます。
+
+{% highlight ruby %}
+## fizzbuzz.rb
+module FizzBuzz
+  refine Fixnum do
+    def fizzbuzz
+      return :FizzBuzz if self % 15 == 0
+      return :Buzz if self % 5 == 0
+      return :Fizz if self % 3 == 0
+
+      self
+    end
+  end
+end 
+{% endhighlight %}
+影響範囲を制御した変更をモジュールの中で行います。
+そしてrefineメソッドを呼んで、変更を記述します。
+
+この影響を受けた、つまりfizzbuzzメソッドが追加されたFixnumを使いたい場合は以下のようにusingを使います。
+
+{% highlight ruby %}
+## exec_fizzbuzz.rb
+require './fizzbuzz'
+
+using FizzBuzz
+(1..100).map {|num| num.fizzbuzz}.each do |num|
+  puts num
+end 
+{% endhighlight %}
+usingでモジュールを指定しています。この指定をしたファイル内ではfizzbuzzメソッドを追加されたFixnumになります。
+
+以下のようにusingを使わない場合はfizzbuzzメソッドの定義されていない通常のFixnumとして処理が動くため、undefined method fizzbuzz for 1:Fixnum (NoMethodError)　が発生します。
+
+{% highlight ruby %}
+## no_exec_fizzbuzz.rb
+require './fizzbuzz'
+
+(1..100).map {|num| num.fizzbuzz}.each do |num|
+  puts num
+end 
+{% endhighlight %}
+
+# gemを使う
+最後に、Rubyにはgemというライブラリ管理ツールが付いています。
+gemコマンドでライブラリをインストール出来ます。
+
+{% highlight sh %}
+ % gem install fizz-buzz
+{% endhighlight %}
+
+このライブラリを使うと、以下のコードでFizzBuzz出来てしまいます。
+
+{% highlight ruby %}
+require 'fizz-buzz'
+
+(1..100).fizzbuzz.each do |v|
+  puts v
+end
+{% endhighlight %}
+詳細な説明は省きますが、オープンクラスの考え方でRangeクラスやArrayクラスをいじっているライブラリになっています。
+興味ある人は、[githubにコード](https://github.com/kerrizor/fizz-buzz/blob/master/lib/fizz-buzz.rb)があるので見てみるといいでしょう。
